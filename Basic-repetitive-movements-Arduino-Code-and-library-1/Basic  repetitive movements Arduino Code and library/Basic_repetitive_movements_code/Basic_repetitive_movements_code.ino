@@ -1,60 +1,54 @@
-#include <Servo.h>    //to define and control servos
-#include <FlexiTimer2.h>//to set a timer to manage all servos
-/* Servos --------------------------------------------------------------------*/
-//define 12 servos for 4 legs
+#include <Servo.h>   
+#include <FlexiTimer2.h>
 Servo servo[4][3];
-//define servos' ports
+
 const int servo_pin[4][3] = { {3, 4, 2}, {6, 7, 5}, {9, 8, 10},{12, 11, 13} };
 
-/* Size of the robot ---------------------------------------------------------*/
+
 const float length_a = 55;
 const float length_b = 77.5;
 const float length_c = 27.5;
 const float length_side = 71;
 const float z_absolute = -28;
 
-/* Constants for movement ----------------------------------------------------*/
+
 const float z_default = -50, z_up = -30, z_boot = z_absolute;
 const float x_default = 62, x_offset = 0;
 const float y_start = 0, y_step = 40;
 const float y_default = x_default;
 
-/* variables for movement ----------------------------------------------------*/
-volatile float site_now[4][3];    //real-time coordinates of the end of each leg
-volatile float site_expect[4][3]; //expected coordinates of the end of each leg
-float temp_speed[4][3];   //each axis' speed, needs to be recalculated before each movement
-float move_speed;     //movement speed
-float speed_multiple = 1; //movement speed multiple
+
+volatile float site_now[4][3];    
+volatile float site_expect[4][3]; 
+float temp_speed[4][3];  
+float move_speed;    
+float speed_multiple = 1; 
 const float spot_turn_speed = 4;
 const float leg_move_speed = 8;
 const float body_move_speed = 3;
 const float stand_seat_speed = 1;
-volatile int rest_counter;      //+1/0.02s, for automatic rest
+volatile int rest_counter;     
 
-//functions' parameter
+
 const float KEEP = 255;
-//define PI for calculation
-const float pi = 3.1415926;
-/* Constants for turn --------------------------------------------------------*/
-//temp length
+const float pi = 3.1415;
+
 const float temp_a = sqrt(pow(2 * x_default + length_side, 2) + pow(y_step, 2));
 const float temp_b = 2 * (y_start + y_step) + length_side;
 const float temp_c = sqrt(pow(2 * x_default + length_side, 2) + pow(2 * y_start + y_step + length_side, 2));
 const float temp_alpha = acos((pow(temp_a, 2) + pow(temp_b, 2) - pow(temp_c, 2)) / 2 / temp_a / temp_b);
-//site for turn
+
 const float turn_x1 = (temp_a - length_side) / 2;
 const float turn_y1 = y_start + y_step / 2;
 const float turn_x0 = turn_x1 - temp_b * cos(temp_alpha);
 const float turn_y0 = temp_b * sin(temp_alpha) - turn_y1 - length_side;
-/*
-  - setup function
-   ---------------------------------------------------------------------------*/
+
 void setup()
 {
-  //start serial for debug
+
   Serial.begin(115200);
   Serial.println("Robot starts initialization");
-  //initialize default parameter
+
   set_site(0, x_default - x_offset, y_start + y_step, z_boot);
   set_site(1, x_default - x_offset, y_start + y_step, z_boot);
   set_site(2, x_default + x_offset, y_start, z_boot);
@@ -66,11 +60,11 @@ void setup()
       site_now[i][j] = site_expect[i][j];
     }
   }
-  //start servo service
+ 
   FlexiTimer2::set(20, servo_service);
   FlexiTimer2::start();
   Serial.println("Servo service started");
-  //initialize servos
+ 
   servo_attach();
   Serial.println("Servos initialized");
   Serial.println("Robot initialization Complete");
@@ -100,9 +94,7 @@ void servo_detach(void)
     }
   }
 }
-/*
-  - loop function
-   ---------------------------------------------------------------------------*/
+
 void loop()
 {
   Serial.println("Stand");
@@ -134,10 +126,7 @@ void loop()
   delay(5000);
 }
 
-/*
-  - sit
-  - blocking function
-   ---------------------------------------------------------------------------*/
+
 void sit(void)
 {
   move_speed = stand_seat_speed;
@@ -148,10 +137,7 @@ void sit(void)
   wait_all_reach();
 }
 
-/*
-  - stand
-  - blocking function
-   ---------------------------------------------------------------------------*/
+
 void stand(void)
 {
   move_speed = stand_seat_speed;
@@ -163,11 +149,6 @@ void stand(void)
 }
 
 
-/*
-  - spot turn to left
-  - blocking function
-  - parameter step steps wanted to turn
-   ---------------------------------------------------------------------------*/
 void turn_left(unsigned int step)
 {
   move_speed = spot_turn_speed;
@@ -175,7 +156,7 @@ void turn_left(unsigned int step)
   {
     if (site_now[3][1] == y_start)
     {
-      //leg 3&1 move
+    
       set_site(3, x_default + x_offset, y_start, z_up);
       wait_all_reach();
 
@@ -242,11 +223,7 @@ void turn_left(unsigned int step)
   }
 }
 
-/*
-  - spot turn to right
-  - blocking function
-  - parameter step steps wanted to turn
-   ---------------------------------------------------------------------------*/
+
 void turn_right(unsigned int step)
 {
   move_speed = spot_turn_speed;
@@ -321,11 +298,7 @@ void turn_right(unsigned int step)
   }
 }
 
-/*
-  - go forward
-  - blocking function
-  - parameter step steps wanted to go
-   ---------------------------------------------------------------------------*/
+
 void step_forward(unsigned int step)
 {
   move_speed = leg_move_speed;
@@ -388,11 +361,6 @@ void step_forward(unsigned int step)
   }
 }
 
-/*
-  - go back
-  - blocking function
-  - parameter step steps wanted to go
-   ---------------------------------------------------------------------------*/
 void step_back(unsigned int step)
 {
   move_speed = leg_move_speed;
@@ -455,7 +423,6 @@ void step_back(unsigned int step)
   }
 }
 
-// add by RegisHsu
 
 void body_left(int i)
 {
@@ -628,12 +595,6 @@ void body_dance(int i)
 }
 
 
-/*
-  - microservos service /timer interrupt function/50Hz
-  - when set site expected,this function move the end point to it in a straight line
-  - temp_speed[4][3] should be set before set expect site,it make sure the end point
-   move in a straight line,and decide move speed.
-   ---------------------------------------------------------------------------*/
 void servo_service(void)
 {
   sei();
@@ -656,11 +617,6 @@ void servo_service(void)
   rest_counter++;
 }
 
-/*
-  - set one of end points' expect site
-  - this founction will set temp_speed[4][3] at same time
-  - non - blocking function
-   ---------------------------------------------------------------------------*/
 void set_site(int leg, float x, float y, float z)
 {
   float length_x = 0, length_y = 0, length_z = 0;
@@ -686,10 +642,6 @@ void set_site(int leg, float x, float y, float z)
     site_expect[leg][2] = z;
 }
 
-/*
-  - wait one of end points move to expect site
-  - blocking function
-   ---------------------------------------------------------------------------*/
 void wait_reach(int leg)
 {
   while (1)
@@ -699,41 +651,30 @@ void wait_reach(int leg)
           break;
 }
 
-/*
-  - wait all of end points move to expect site
-  - blocking function
-   ---------------------------------------------------------------------------*/
+
 void wait_all_reach(void)
 {
   for (int i = 0; i < 4; i++)
     wait_reach(i);
 }
 
-/*
-  - trans site from cartesian to polar
-  - mathematical model 2/2
-   ---------------------------------------------------------------------------*/
+
 void cartesian_to_polar(volatile float &alpha, volatile float &beta, volatile float &gamma, volatile float x, volatile float y, volatile float z)
 {
-  //calculate w-z degree
+
   float v, w;
   w = (x >= 0 ? 1 : -1) * (sqrt(pow(x, 2) + pow(y, 2)));
   v = w - length_c;
   alpha = atan2(z, v) + acos((pow(length_a, 2) - pow(length_b, 2) + pow(v, 2) + pow(z, 2)) / 2 / length_a / sqrt(pow(v, 2) + pow(z, 2)));
   beta = acos((pow(length_a, 2) + pow(length_b, 2) - pow(v, 2) - pow(z, 2)) / 2 / length_a / length_b);
-  //calculate x-y-z degree
+
   gamma = (w >= 0) ? atan2(y, x) : atan2(-y, -x);
-  //trans degree pi->180
+
   alpha = alpha / pi * 180;
   beta = beta / pi * 180;
   gamma = gamma / pi * 180;
 }
 
-/*
-  - trans site from polar to microservos
-  - mathematical model map to fact
-  - the errors saved in eeprom will be add
-   ---------------------------------------------------------------------------*/
 void polar_to_servo(int leg, float alpha, float beta, float gamma)
 {
   if (leg == 0)
